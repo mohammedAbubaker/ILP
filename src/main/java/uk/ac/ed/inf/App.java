@@ -8,6 +8,7 @@ import uk.ac.ed.inf.ilp.data.Order;
  */
 public class App 
 {
+    Order oder = new Order();
     public static void main( String[] args )
     {
         System.out.println( "Hello World!" );
