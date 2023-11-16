@@ -1,16 +1,9 @@
 package uk.ac.ed.inf;
-
-import uk.ac.ed.inf.ilp.data.Order;
-
-/**
- * Hello world!
- *
- */
-public class App 
+public class App
 {
-    Order oder = new Order();
     public static void main( String[] args )
     {
-        System.out.println( "Hello World!" );
+        AppService appService = new AppService(args[1], args[0]);
+        appService.runAppService();
     }
 }
