@@ -101,8 +101,7 @@ public class AppService {
         parseData();
         long start_time = System.nanoTime();
         VisibilityGraph visibilityGraph = new VisibilityGraph(this);
-        long end_time = System.nanoTime();
-        System.out.println((end_time - start_time) / 1_000_000_000.0);
+
         // initialise orderValidator]
         OrderValidator orderValidator = new OrderValidator();
         // store all orders with restaurant names
@@ -120,8 +119,12 @@ public class AppService {
                 visibilityGraph.updateViGraph(this,  destination);
                 visibilityGraph.plotGraph();
                 this.dest = destination;
+                // handle pathfinding
+
             }
         }
+        long end_time = System.nanoTime();
+        System.out.println((end_time - start_time) / 1_000_000_000.0);
     }
 
     // ------------------------------------------------------------------
