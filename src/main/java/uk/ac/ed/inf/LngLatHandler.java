@@ -7,14 +7,7 @@ import uk.ac.ed.inf.ilp.interfaces.LngLatHandling;
 
 import java.util.ArrayList;
 
-import static java.lang.Math.sqrt;
-import static java.lang.Math.pow;
-import static java.lang.Math.toRadians;
-import static java.lang.Math.sin;
-import static java.lang.Math.cos;
-import static java.lang.Math.min;
-import static java.lang.Math.max;
-import static java.lang.Math.PI;
+import static java.lang.Math.*;
 
 public class LngLatHandler implements LngLatHandling {
     @Override
@@ -93,50 +86,21 @@ public class LngLatHandler implements LngLatHandling {
         double resultLng = startPosition.lng();
         double resultLat = startPosition.lat();
         if (angle != 999.0) {
-            resultLat += SystemConstants.DRONE_MOVE_DISTANCE*sin(toRadians(angle));
             resultLng += SystemConstants.DRONE_MOVE_DISTANCE*cos(toRadians(angle));
+            resultLat += SystemConstants.DRONE_MOVE_DISTANCE*sin(toRadians(angle));
         }
         return (new LngLat(resultLng, resultLat));
     }
-
-    public LngLat[] getBounds(ArrayList<LngLat> vertices) {
-        double min_lng = Double.MAX_VALUE;
-        double max_lng = Double.MIN_VALUE;
-        double min_lat = Double.MAX_VALUE;
-        double max_lat = Double.MIN_VALUE;
-        for (LngLat vertex: vertices) {
-            if (vertex.lng() < min_lng) {
-                min_lng = vertex.lng();
-            }
-
-            if (vertex.lng() > max_lng) {
-                max_lng = vertex.lng();
-            }
-
-            if (vertex.lat() < min_lat) {
-                min_lat = vertex.lat();
-            }
-
-            if (vertex.lat() > max_lat) {
-                max_lat = vertex.lat();
-            }
-        }
-        return new LngLat[]{new LngLat(min_lng, min_lat), new LngLat(max_lng, max_lat)};
-    }
-
-    public ArrayList<LngLat> getNeighbours(LngLat coord, int dir, double step, LngLat bound1, LngLat bound2) {
+    public ArrayList<LngLat> getNeighbours(LngLat coord, NamedRegion[] noFlyZones) {
         ArrayList<LngLat> neighbours = new ArrayList<>();
         double angle = 0.0;
-        double angle_increment = 2 * PI / dir;
+        double angle_increment = 2 * PI / 16;
         while (angle < 2*PI) {
-            LngLatHandler lngLatHandler = new LngLatHandler();
-            LngLat neighbour = nextPosition(coord, angle);
+            LngLat neighbour = nextPosition(coord, toDegrees(angle));
             angle += angle_increment;
-            if (neighbour.lng() < min(bound1.lng(), bound2.lng())) { continue;}
-            if (neighbour.lng() > max(bound1.lng(), bound2.lng())) { continue;}
-            if (neighbour.lat() < min(bound1.lat(), bound2.lat())) { continue;}
-            if (neighbour.lat() > max(bound1.lat(), bound2.lat())) { continue;}
-            neighbours.add(neighbour);
+            if (!isInRegions(neighbour, noFlyZones)) {
+                neighbours.add(neighbour);
+            }
         }
         return neighbours;
     }

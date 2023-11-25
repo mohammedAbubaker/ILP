@@ -8,7 +8,7 @@ public class Feature {
     private Geometry geometry;
 
     public Feature(Geometry geometry, String propertyName) {
-        this.type = "feature";
+        this.type = "Feature";
         this.geometry = geometry;
         this.properties = new Properties(propertyName);
     }

@@ -1,6 +1,11 @@
 package uk.ac.ed.inf;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import uk.ac.ed.inf.geojson.Feature;
+import uk.ac.ed.inf.geojson.GeoJson;
+import uk.ac.ed.inf.geojson.Geometry;
 import uk.ac.ed.inf.ilp.constant.OrderValidationCode;
 import uk.ac.ed.inf.ilp.data.*;
 
@@ -9,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import uk.ac.ed.inf.utils.LocalDateDeserialize;
 
 import java.io.BufferedReader;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
@@ -99,32 +105,43 @@ public class AppService {
     public void runAppService() {
         // retrieve data
         parseData();
+        ArrayList<Feature> featureCollection = new ArrayList<>();
+        featureCollection.add(new Feature(new Geometry(this.centralArea.vertices(), "Polygon"), "centralArea"));
+        for (NamedRegion zone: this.noFlyZones) {
+            featureCollection.add(new Feature(new Geometry(zone.vertices(), "Polygon"), "noFlyZone"));
+        }
+        int success_full = 0;
+        int n_orders = 0;
         long start_time = System.nanoTime();
-        VisibilityGraph visibilityGraph = new VisibilityGraph(this);
-
         // initialise orderValidator]
         OrderValidator orderValidator = new OrderValidator();
         // store all orders with restaurant names
         for (Order order: this.orders) {
             // skip if order does not correspond to the provided date
-            if (!order.getOrderDate().isEqual(this.date)) {
-                continue;
-            }
+            //if (!order.getOrderDate().isEqual(this.date)) {
+            //    continue;
+            //}
             // skip if order fails validation
             if (!orderValidator.validateOrder(order, this.restaurants).getOrderValidationCode().equals(OrderValidationCode.NO_ERROR)) {
                 continue;
             }
-            LngLat destination = getRestaurantFromOrder(order, restaurants).location();
-            if (destination != null) {
-                visibilityGraph.updateViGraph(this,  destination);
-                visibilityGraph.plotGraph();
-                this.dest = destination;
-                // handle pathfinding
-
+            this.dest = getRestaurantFromOrder(order, restaurants).location();
+            if (this.dest != null) {
+                DronePathFinder dronePathFinder = new DronePathFinder(this);
+                LngLat[] dronePath = dronePathFinder.getRoute();
+                if (dronePath.length > 1) {
+                    System.out.println("done");
+                    success_full += 1;
+                }
+                featureCollection.add(new Feature(new Geometry(dronePath, "LineString"), "dronePath"));
             }
+            n_orders += 1;
         }
         long end_time = System.nanoTime();
         System.out.println((end_time - start_time) / 1_000_000_000.0);
+        System.out.println("n_orders " + n_orders);
+        System.out.println("successful orders " + success_full);
+        plotGraph(featureCollection);
     }
 
     // ------------------------------------------------------------------
@@ -141,5 +158,28 @@ public class AppService {
     }
     public NamedRegion[] getNoFlyZones() {
         return this.noFlyZones;
+    }
+
+    void addGraph(ArrayList<Feature> featureCollection, DronePathFinder dronePathFinder) {
+        for (String edge: dronePathFinder.visibilityGraph.edges) {
+            featureCollection.add(
+                    new Feature(
+                            new Geometry(new LngLat[]{dronePathFinder.visibilityGraph.nodes.get(Integer.parseInt(edge.split(" ")[0])), dronePathFinder.visibilityGraph.nodes.get(Integer.parseInt(edge.split(" ")[1]))}, "LineString"), "vigraphLines"));
+        }
+    }
+    void plotGraph(ArrayList<Feature> featureCollection) {
+        // generate feature collection
+        // add central area polygon
+        // add noflyzone polygons
+        GeoJson geojson = new GeoJson(featureCollection.toArray(Feature[]::new));
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
+        try {
+            String json = objectMapper.writeValueAsString(geojson);
+            FileOutputStream fileOutputStream = new FileOutputStream("all.json");
+            fileOutputStream.write(json.getBytes()); }
+        catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
     }
 }

@@ -11,12 +11,8 @@ import uk.ac.ed.inf.ilp.data.NamedRegion;
 
 import java.awt.geom.Line2D;
 import java.io.FileOutputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 
-import static java.util.Arrays.asList;
 
 public class VisibilityGraph {
     ArrayList<LngLat> nodes;
@@ -25,13 +21,14 @@ public class VisibilityGraph {
     NamedRegion[] noFlyZones;
 
     NamedRegion centralArea;
+    HashMap<LngLat, ArrayList<LngLat>> edgeSet;
 
     // Given two points,
     private boolean hasVisibility(LngLat p, LngLat q) {
         for (NamedRegion zone : this.noFlyZones)  {
             for (int i = 0; i < zone.vertices().length - 1; i++) {
                 // if both points lie on the same polygon then return false
-                if (Arrays.asList(zone.vertices()).contains(p) && Arrays.asList(zone.vertices()).contains(q)) {
+                if (List.of(zone.vertices()).contains(p) && (List.of(zone.vertices()).contains(q))) {
                     return false;
                 }
                 LngLat r = zone.vertices()[i];
@@ -42,20 +39,24 @@ public class VisibilityGraph {
                     // ignore intersections that are just p = (r or s) or q = (r or s)
                     boolean eqP = r.equals(p) || s.equals(p);
                     boolean eqQ = r.equals(q) || s.equals(q);
-                    if (eqP || eqQ) return false;
+                    if (!(eqP || eqQ)) {
+                        return false;
+                    }
                 }
             }
         }
         return true;
     }
-    public VisibilityGraph(AppService appService) {
+    public VisibilityGraph(DronePathFinder dronePathFinder) {
         // fill nodes with source, centralArea and noFlyZone vertices
-        this.noFlyZones = appService.getNoFlyZones();
-        this.centralArea = appService.getCentralArea();
+        this.noFlyZones = dronePathFinder.getNoFlyZones();
+        this.centralArea = dronePathFinder.getCentralArea();
         this.nodes = new ArrayList<>();
-        this.nodes.add(appService.getSrc());
-        this.nodes.addAll(List.of(appService.getCentralArea().vertices()));
-        for (NamedRegion zone: appService.getNoFlyZones()) {
+        this.nodes.add(dronePathFinder.getSrc());
+        this.nodes.add(dronePathFinder.getDest());
+        this.edgeSet = new HashMap<>();
+        this.nodes.addAll(List.of(dronePathFinder.getCentralArea().vertices()));
+        for (NamedRegion zone: dronePathFinder.getNoFlyZones()) {
             this.nodes.addAll(List.of(zone.vertices()));
         }
         // construct edges
@@ -65,30 +66,18 @@ public class VisibilityGraph {
                 // test for visibility with distinct pairwise combination of nodes
                 if (hasVisibility(nodes.get(i), nodes.get(j))) {
                     edges.add(i + " " + j);
+                    if (!edgeSet.containsKey(nodes.get(i))) {
+                        edgeSet.put(nodes.get(i), new ArrayList<>());
+                    }
+                    if (!edgeSet.containsKey(nodes.get(j))) {
+                        edgeSet.put(nodes.get(j), new ArrayList<>());
+                    }
+                    edgeSet.get(nodes.get(i)).add(nodes.get(j));
+                    edgeSet.get(nodes.get(j)).add(nodes.get(i));
                 }
             }
         }
-    }
-
-    private static boolean checkEdgeEquality(String edge, int n) {
-        int i = Integer.parseInt(edge.split(" ")[0]);
-        int j = Integer.parseInt(edge.split(" ")[1]);
-        return ((i == n) || (j ==n));
-    }
-
-    // update visibility graph with destination information
-    public void updateViGraph(AppService appService, LngLat dest) {
-        int n = this.nodes.size() - 1;
-        if (appService.getDest() != null) {
-            this.edges.removeIf(e -> checkEdgeEquality(e, n));
-            this.nodes.remove(n);
-        }
-        this.nodes.add(dest);
-        for (int i = 0; i < this.nodes.size() - 1; i++) {
-            if (hasVisibility(this.nodes.get(i), dest)) {
-                edges.add(i + " " + n);
-            }
-        }
+        plotGraph();
     }
 
     void plotGraph() {
